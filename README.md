@@ -29,4 +29,4 @@ The scripts are numbered to be run in sequential order. Here is the data flow:
     * **Input:** `ai_exposure_results.jsonl`
     * **Output:** `Batch_B_Exposure_Report.xlsx` (Formatted Excel report for Exposure)
  
-    * Sonnet Model which was used previously is not working for some reason this time.
+Sonnet Model which was used previously is not working for some reason this time.
