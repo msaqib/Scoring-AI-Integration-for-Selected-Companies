@@ -1,6 +1,7 @@
 import os
 import re
 import json
+from collections import defaultdict
 import pandas as pd
 from sec_edgar_downloader import Downloader
 from bs4 import BeautifulSoup
@@ -259,20 +260,40 @@ def collect_ai_paragraphs(
 
 def save_results_per_company(results, output_folder="ai_extracted"):
     """
-    Saves one JSON file per CIK:
-        <CIK>.json
+    Writes a transformed JSON per CIK in the same format produced by
+    `2b_convert_json.py`.  Each file will look like:
+
+        {
+            "cik": "0000001234",
+            "filings": {
+                "2018": [ {"text": "..."}, ... ],
+                "2019": [...],
+                ...
+            }
+        }
+
+    This eliminates the need for the separate conversion step.
     """
 
     os.makedirs(output_folder, exist_ok=True)
 
     for cik, records in results.items():
+        grouped = defaultdict(list)
+        for rec in records:
+            year = str(rec["filing_year"])
+            grouped[year].append({"text": rec["text"]})
+
+        output_data = {
+            "cik": cik,
+            "filings": dict(grouped)
+        }
 
         output_path = os.path.join(output_folder, f"{cik}.json")
-
         with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(records, f, indent=2, ensure_ascii=False)
+            json.dump(output_data, f, indent=2, ensure_ascii=False)
 
-        print(f"Saved {len(records)} records → {output_path}")
+        total = sum(len(v) for v in grouped.values())
+        print(f"Saved {total} records grouped by year → {output_path}")
 
 
 def download():
@@ -313,4 +334,11 @@ def download():
     #         print(f"Error {cik}: {e}")
 
 if __name__ == "__main__":
+    # existing call for full-data run:
     download()
+
+    # quick‑check block – uncomment when you want to smoke‑test
+    # small_ciks = ["0000006281", "0000050863"]   # Apple + Intel, for instance
+    # data = collect_ai_paragraphs(cik_list=small_ciks, email=EMAIL,
+    #                             start_year=2023, end_year=2024)
+    # save_results_per_company(data, output_folder="ai_extracted_test")
