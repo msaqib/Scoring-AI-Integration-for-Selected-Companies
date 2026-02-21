@@ -235,13 +235,19 @@ def process_year(cik: str, year: str, entries: list, outf, adoption_outf=None):
 
     # Initialize accumulators
     agg = {
-        "raw_weight_sum": 0.0,
-        "weight_sum": 0.0,
+        "cik": cik,
+        "year": int(year) if year.isdigit() else year,
+        "adoption_weight_sum": 0.0,
+        "raw_adoption_weight_sum": 0.0,
         "direction": defaultdict(float),
         "topics": defaultdict(float),
         "timeline": defaultdict(float),
         "aggressiveness": defaultdict(float)
     }
+    if (len(entries) == 0):
+        if adoption_outf:
+            adoption_outf.write(json.dumps(agg, ensure_ascii=False) + "\n")
+        return
 
     for idx, entry in enumerate(entries, start=1):
         text = entry.get("text", "")
