@@ -12,7 +12,7 @@ OUTPUT_FILE = "output.jsonl"
 ADOPTION_OUTPUT_FILE = "adoption_output.jsonl"
 
 import hashlib
-from datetime import datetime
+from datetime import datetime, UTC
 
 # grab API key from environment variable, leaving empty string if not set
 API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
@@ -196,7 +196,7 @@ def process_statement(cik: str, year: str, idx: int, text: str, outf,
 
     para_id = f"{year}_p{idx}"
     para_hash = hashlib.md5(text.encode("utf-8")).hexdigest()
-    timestamp = datetime.utcnow().isoformat() + "Z"
+    timestamp = datetime.now(UTC).isoformat() + "Z"
 
     parsed = None
     raw_output = None
