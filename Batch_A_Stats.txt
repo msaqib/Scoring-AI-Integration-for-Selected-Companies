@@ -1,0 +1,6 @@
+AI ADOPTION VALIDATION RESULTS
+--------------------------------
+Sample Size: 20
+Pearson Correlation (Linear):  0.2557 (p=0.2765)
+Spearman Correlation (Rank):   0.2909 (p=0.2134)
+--------------------------------
