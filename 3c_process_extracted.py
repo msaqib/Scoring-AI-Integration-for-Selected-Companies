@@ -1,4 +1,5 @@
 import os
+import math
 import json
 import anthropic
 from collections import defaultdict
@@ -234,6 +235,7 @@ def process_year(cik: str, year: str, entries: list, outf, adoption_outf=None):
 
     # Initialize accumulators
     agg = {
+        "raw_weight_sum": 0.0,
         "weight_sum": 0.0,
         "direction": defaultdict(float),
         "topics": defaultdict(float),
@@ -255,7 +257,7 @@ def process_year(cik: str, year: str, entries: list, outf, adoption_outf=None):
         if weight == 0:
             continue
 
-        agg["weight_sum"] += weight
+        agg["raw_weight_sum"] += weight
 
         for d, v in parsed.get("direction", {}).items():
             agg["direction"][d] += v * weight
@@ -266,6 +268,19 @@ def process_year(cik: str, year: str, entries: list, outf, adoption_outf=None):
         for a, v in parsed.get("aggressiveness", {}).items():
             agg["aggressiveness"][a] += v * weight
 
+    n_paragraphs = sum(
+        1 for idx, entry in enumerate(entries, start=1)
+        if (parsed := process_statement(cik, year, idx, entry.get("text", ""), outf)[0])
+        and not parsed.get("error")
+        and parsed.get("ai_relevance_score", 0) >= 0.05
+    )
+
+    # Apply log + per-paragraph normalization to adoption_weight_sum
+    if n_paragraphs > 0:
+        adoption_score = math.log1p(agg["raw_weight_sum"]) / n_paragraphs
+    else:
+        adoption_score = 0.0
+        
     # Normalize weighted sums
     def normalize(d):
         total = sum(d.values())
@@ -277,7 +292,9 @@ def process_year(cik: str, year: str, entries: list, outf, adoption_outf=None):
     normalized = {
         "cik": cik,
         "year": int(year) if year.isdigit() else year,
-        "adoption_weight_sum": agg["weight_sum"],
+        # "adoption_weight_sum": agg["weight_sum"],
+        "adoption_weight_sum": adoption_score,
+        "raw_adoption_weight_sum": agg["raw_weight_sum"],
         "direction": normalize(agg["direction"]),
         "topics": normalize(agg["topics"]),
         "timeline": normalize(agg["timeline"]),
