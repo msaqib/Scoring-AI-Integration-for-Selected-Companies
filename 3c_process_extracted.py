@@ -3,6 +3,7 @@ import math
 import json
 import anthropic
 from collections import defaultdict
+from datetime import datetime, UTC
 
 # directory containing the individual JSON extraction files
 BASE_DIR = "ai_extracted"
@@ -10,13 +11,16 @@ BASE_DIR = "ai_extracted"
 OUTPUT_DIR = "llm_outputs"
 OUTPUT_FILE = "output.jsonl"
 ADOPTION_OUTPUT_FILE = "adoption_output.jsonl"
+INTENSITY_OUTPUT_FILE_NAME = "adoption_output"
+OUT_EXT=".jsonl"
 
 import hashlib
 from datetime import datetime, UTC
 
 # grab API key from environment variable, leaving empty string if not set
 API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-MODEL = "claude-3-haiku-20240307"
+# MODEL = "claude-3-haiku-20240307"
+MODEL = "claude-sonnet-4-6"
 TEMPERATURE = 0.2
 
 client = anthropic.Anthropic(api_key=API_KEY)
@@ -106,7 +110,31 @@ If you include anything other than JSON, the output will be discarded. Here's an
 "overall_confidence": 0.3
 }"""
 
-import json
+
+def get_next_filename(base_filename, extension):
+    """
+    Generates the next available filename with an incrementing number suffix.
+
+    Args:
+        base_filename (str): The desired base name of the file (e.g., 'sample_data').
+        extension (str): The file extension (e.g., '.txt', '.zip').
+
+    Returns:
+        str: The unique, incremented filename.
+    """
+    number = 1
+    # Loop indefinitely until a non-existent filename is found
+    while True:
+        # Format the filename with the current number
+        new_filename = f"{base_filename}_{number:03d}{extension}"
+        
+        # Check if the generated filename already exists
+        if not os.path.exists(new_filename):
+            # If it doesn't exist, this is the unique filename to use
+            return new_filename
+        
+        # If it exists, increment the number and try again
+        number += 1
 
 def extract_json_object(text):
     start = text.find('{')
@@ -235,10 +263,12 @@ def process_year(cik: str, year: str, entries: list, outf, adoption_outf=None):
 
     # Initialize accumulators
     agg = {
+        "timestamp" : datetime.now(UTC).isoformat() + "Z",
         "cik": cik,
         "year": int(year) if year.isdigit() else year,
         "adoption_weight_sum": 0.0,
         "raw_adoption_weight_sum": 0.0,
+        "raw_weight_sum": 0.0,
         "direction": defaultdict(float),
         "topics": defaultdict(float),
         "timeline": defaultdict(float),
@@ -296,6 +326,7 @@ def process_year(cik: str, year: str, entries: list, outf, adoption_outf=None):
             return {k: 0.0 for k in d}
 
     normalized = {
+        "timestamp": agg["timestamp"],
         "cik": cik,
         "year": int(year) if year.isdigit() else year,
         # "adoption_weight_sum": agg["weight_sum"],
@@ -339,7 +370,8 @@ def process_dir(path: str = BASE_DIR) -> None:
     # ensure output directory exists
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     outpath = os.path.join(OUTPUT_DIR, OUTPUT_FILE)
-    adoption_outpath = os.path.join(OUTPUT_DIR, ADOPTION_OUTPUT_FILE)
+    # adoption_outpath = os.path.join(OUTPUT_DIR, ADOPTION_OUTPUT_FILE)
+    adoption_outpath = get_next_filename(os.path.join(OUTPUT_DIR, INTENSITY_OUTPUT_FILE_NAME), OUT_EXT)
     with open(outpath, "a") as outf:
         for fname in sorted(os.listdir(path)):
             if not fname.endswith(".json"):
@@ -436,10 +468,19 @@ def test_file(path: str, outf_path=None, adoption_outf_path=None) -> None:
     #             outf.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
+# TEST_OUTPUT_FILE_NAME="test" 
+# OUT_EXT=".jsonl"
+
+# def test_seq_file():
+#     os.makedirs(OUTPUT_DIR, exist_ok=True)
+#     adoption_outpath = get_next_filename(os.path.join(OUTPUT_DIR, TEST_OUTPUT_FILE_NAME), OUT_EXT)
+#     with open(adoption_outpath, "a") as outf:
+#         outf.write("Testing")
 
 if __name__ == "__main__":
     import sys
-
+    print(len(sys.argv))
+    print(sys.argv[1])
     if len(sys.argv) > 2 and sys.argv[1] == "--test":
         test_file(sys.argv[2], "llm_outputs/test_output.jsonl", "llm_outputs/test_adoption_output.jsonl")
     else:
