@@ -1,0 +1,15 @@
+{
+  "cik": "0000935036",
+  "filings": {
+    "2018": [
+      {
+        "text": "UP Payments Risk Management solution is a cloud-based, 360-degree approach to enterprise fraud management. The solution is designed to combat existing and emerging fraud threats using a combination of machine learning, fraud and payments data, advanced analytics, flexible rules and agile decision strategies. For banks and financial intermediaries, the ACI Proactive Risk Manager component gives customers real-time visibility into threats across their enterprise, including issuer card fraud, check/deposit fraud, wire fraud, merchant acquirer fraud, internal fraud and money laundering schemes at multiple perspectives, ranging from an account or customer level. For merchants, ReD Shield provides real-time fraud prevention for eCommerce and mCommerce transactions."
+      }
+    ],
+    "2017": [
+      {
+        "text": "UP Payments Risk Management is a comprehensive fraud prevention and detection solution designed for both financial institutions and merchants. At the core of our solution is ACI’s Proactive Risk Manager, a comprehensive crime management solution that uses predictive analytics and expertly defined rules to help customers successfully identify and mitigate fraud. Our solution for merchants uses Proactive Risk Manager in conjunction with ReD Shield to help customers minimize risk across multiple channels in real time."
+      }
+    ]
+  }
+}
