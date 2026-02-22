@@ -1,6 +1,7 @@
 import os
 import re
 import json
+from collections import defaultdict
 import pandas as pd
 from sec_edgar_downloader import Downloader
 from bs4 import BeautifulSoup
@@ -79,38 +80,6 @@ def extract_main_10k(raw_text):
 
     return None
 
-
-# ==============================
-# HTML → PARAGRAPH SEGMENTATION
-# ==============================
-
-# def extract_candidate_paragraphs(html):
-#     soup = BeautifulSoup(html, "lxml")
-
-#     # Remove non-content elements
-#     for tag in soup(["script", "style", "table", "noscript"]):
-#         tag.decompose()
-
-#     candidates = []
-#     blocks = soup.find_all(["p", "div", "li"])
-
-#     seen = set()
-
-#     for block in blocks:
-#         text = block.get_text(" ", strip=True)
-
-#         if len(text) < 60:
-#             continue
-
-#         if KEYWORDS.search(text):
-#             normalized = re.sub(r"\s+", " ", text)
-
-#             if normalized not in seen:
-#                 seen.add(normalized)
-#                 candidates.append(normalized)
-
-#     return candidates
-
 def normalize_text(text):
     # Replace non-breaking spaces and other Unicode spaces
     text = text.replace("\xa0", " ")
@@ -167,7 +136,6 @@ def extract_filing_year(raw_text):
 # ==============================
 # MAIN PIPELINE FUNCTION
 # ==============================
-
 def collect_ai_paragraphs(
     cik_list,
     email,
@@ -175,27 +143,18 @@ def collect_ai_paragraphs(
     start_year=2017,
     end_year=2025
 ):
-    """
-    Returns:
-        {
-            cik1: [ {json objects} ],
-            cik2: [ ... ],
-        }
-    """
 
     os.makedirs(download_folder, exist_ok=True)
-
     dl = Downloader("AI_Research_Project", email, download_folder)
 
     results = {}
-    print("Yes, we're here")
+
     for cik in cik_list:
         cik_str = str(cik).zfill(10)
         print(f"\nProcessing CIK {cik_str}")
 
         results[cik_str] = []
 
-        # Download filings for broad date range
         dl.get(
             "10-K",
             cik_str,
@@ -204,75 +163,91 @@ def collect_ai_paragraphs(
         )
 
         cik_path = os.path.join(download_folder, cik_str, "10-K")
-
         if not os.path.exists(cik_path):
-            print("Aint no CIK path" )
-            print(cik_path)
             continue
 
         for accession_dir in os.listdir(cik_path):
-
             accession_path = os.path.join(cik_path, accession_dir)
-
             if not os.path.isdir(accession_path):
                 continue
 
             full_submission_path = os.path.join(accession_path, "full-submission.txt")
-
             if not os.path.exists(full_submission_path):
                 continue
 
             with open(full_submission_path, "r", encoding="utf-8", errors="ignore") as f:
                 raw = f.read()
 
+            filing_year = extract_filing_year(raw)
+            if filing_year is None:
+                continue
 
-                filing_year = extract_filing_year(raw)
+            if filing_year < start_year or filing_year > end_year:
+                continue
 
-                if filing_year is None:
-                    print("Aint no filing year")
-                    continue
+            html = extract_main_10k(raw)
+            if not html:
+                continue
 
-                if filing_year < start_year or filing_year > end_year:
-                    print("Filing year beyond range")
-                    print(filing_year)
-                    continue
+            paragraphs = extract_candidate_paragraphs(html)
 
-                html = extract_main_10k(raw)
-
-                if not html:
-                    print("❌ No 10-K HTML extracted")
-                else:
-                    print("✅ Extracted HTML length:", len(html))
-                    print("Contains 'artificial intelligence'?:",
-                        "artificial intelligence" in html.lower())
-
-                paragraphs = extract_candidate_paragraphs(html)
-
+            # Always register the year — even if no matches
+            if len(paragraphs) == 0:
+                results[cik_str].append({
+                    "cik": cik_str,
+                    "filing_year": filing_year,
+                    "text": None
+                })
+            else:
                 for para in paragraphs:
                     results[cik_str].append({
                         "cik": cik_str,
                         "filing_year": filing_year,
-                        "text": para,
+                        "text": para
                     })
 
     return results
 
+
 def save_results_per_company(results, output_folder="ai_extracted"):
     """
-    Saves one JSON file per CIK:
-        <CIK>.json
+    Writes a transformed JSON per CIK in the same format produced by
+    `2b_convert_json.py`.  Each file will look like:
+
+        {
+            "cik": "0000001234",
+            "filings": {
+                "2018": [ {"text": "..."}, ... ],
+                "2019": [...],
+                ...
+            }
+        }
+
+    This eliminates the need for the separate conversion step.
     """
 
     os.makedirs(output_folder, exist_ok=True)
 
     for cik, records in results.items():
+        grouped = defaultdict(list)
+        for rec in records:
+            year = str(rec["filing_year"])
+            if rec["text"] is not None:
+                grouped[year].append({"text": rec["text"]})
+            else:
+                # ensure year exists but don't add fake paragraph
+                grouped.setdefault(year, [])
+        output_data = {
+            "cik": cik,
+            "filings": dict(grouped)
+        }
 
         output_path = os.path.join(output_folder, f"{cik}.json")
-
         with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(records, f, indent=2, ensure_ascii=False)
+            json.dump(output_data, f, indent=2, ensure_ascii=False)
 
-        print(f"Saved {len(records)} records → {output_path}")
+        total = sum(len(v) for v in grouped.values())
+        print(f"Saved {total} records grouped by year → {output_path}")
 
 
 def download():
@@ -291,26 +266,12 @@ def download():
     save_results_per_company(data)
 
 
-    # for cik in df['cik']:
-    #     name = f"{cik}_2018.txt"
-    #     path = os.path.join(FOLDER, name)
-    #     if os.path.exists(path): 
-    #         continue
-        
-    #     try:
-    #         # Get 2018 10-K
-    #         dl.get("10-K", str(cik).zfill(10), after="2018-01-01", before="2019-01-01")
-            
-    #         # Move and clean up
-    #         base = os.path.join(FOLDER, "sec-edgar-filings", str(cik).zfill(10), "10-K")
-    #         if os.path.exists(base):
-    #             fid = os.listdir(base)[0]
-    #             src = os.path.join(base, fid, "full-submission.txt")
-    #             shutil.move(src, path)
-    #             shutil.rmtree(os.path.join(FOLDER, "sec-edgar-filings"))
-    #             print(f"Saved {cik}")
-    #     except Exception as e:
-    #         print(f"Error {cik}: {e}")
-
 if __name__ == "__main__":
+    # existing call for full-data run:
     download()
+
+    # quick‑check block – uncomment when you want to smoke‑test
+    # small_ciks = ["0000006281", "0000050863"]   # Apple + Intel, for instance
+    # data = collect_ai_paragraphs(cik_list=small_ciks, email=EMAIL,
+    #                             start_year=2023, end_year=2024)
+    # save_results_per_company(data, output_folder="ai_extracted_test")
