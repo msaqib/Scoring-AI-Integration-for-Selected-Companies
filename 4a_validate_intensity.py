@@ -6,10 +6,13 @@ STEP 4a: VALIDATE STRATEGIC INTENSITY (BATCH A)
 3. Saves Excel Report & Correlation Stats.
 """
 import pandas as pd
+import numpy as np
 import json
 import re
 import os
 from scipy.stats import pearsonr, spearmanr
+import matplotlib.pyplot as plt
+import argparse
 
 # Files
 # AI_FILE = "ai_scores_intensity.jsonl"
@@ -18,17 +21,17 @@ TRUTH_FILE = "Pilot_Truth_Data.csv"
 REPORT_FILE = "Batch_A_Report.xlsx"
 STATS_FILE = "Batch_A_Stats.txt"
 
-def validate_adoption():
+def validate_adoption(aifile):
     print("📊 Validating AI Adoption Scores...")
 
     # 1️⃣ Load AI Results (JSONL)
-    if not os.path.exists(AI_FILE):
-        print(f"❌ Error: {AI_FILE} not found.")
+    if not os.path.exists(aifile):
+        print(f"❌ Error: {aifile} not found.")
         return
 
     ai_data = []
 
-    with open(AI_FILE, 'r') as f:
+    with open(aifile, 'r') as f:
         for line in f:
             try:
                 rec = json.loads(line)
@@ -106,7 +109,34 @@ def validate_adoption():
 
     else:
         print("⚠️ Not enough data for correlation.")
+    coef = np.polyfit(
+    merged["ai_adoption_score"],
+    merged["truth_score"],
+    1
+    )
 
+    # Predicted truth
+    merged["predicted_truth"] = (
+        coef[0] * merged["ai_adoption_score"] + coef[1]
+    )
+
+    # Residuals
+    merged["residual"] = (
+        merged["truth_score"] - merged["predicted_truth"]
+    )
+
+    # Plot residuals by CIK
+    plt.figure(figsize=(10,6))
+    plt.bar(merged["cik"].astype(str), merged["residual"])
+    plt.xticks(rotation=90)
+    plt.axhline(0, linestyle='--')
+    plt.title("Residuals (Truth − Predicted)")
+    plt.ylabel("Residual")
+    plt.xlabel("CIK")
+    plt.tight_layout()
+    plt.savefig("residuals.png", bbox_inches='tight', dpi=300)
+    plt.show()
+    
 
 
 def validate_a():
@@ -176,4 +206,11 @@ def validate_a():
         print("⚠️ Not enough data for correlation.")
 
 if __name__ == "__main__":
-    validate_adoption()
+    parser = argparse.ArgumentParser(description='A script that requires a file name of AI generated intensity results file.')
+    # 'aifile' is defined as a mandatory positional argument
+    parser.add_argument('aifile', type=str, help='The name of the AI generated intensity results file.')
+
+    args = parser.parse_args()
+
+    print(f"Validating AI results file: {args.aifile}")
+    validate_adoption(args.aifile)

@@ -86,12 +86,41 @@ def normalize_text(text):
     text = re.sub(r"\s+", " ", text)
     return text.strip()
 
+def is_visible(tag):
+    current = tag
+
+    while current:
+        style = current.get("style", "")
+        if style:
+            style = style.lower()
+            for decl in style.split(";"):
+                if ":" in decl:
+                    prop, value = decl.split(":", 1)
+                    if prop.strip() == "display" and value.strip() == "none":
+                        return False
+
+        current = current.parent
+
+    return True
+
+def remove_hidden_elements(soup):
+    hidden_tags = soup.find_all(
+        lambda t: t.get("style") and
+        "display" in t.get("style").lower() and
+        "none" in t.get("style").lower()
+    )
+
+    for tag in hidden_tags:
+        tag.decompose()
+
 
 def extract_candidate_paragraphs(html):
     soup = BeautifulSoup(html, "lxml")
 
     for tag in soup(["script", "style", "noscript"]):
         tag.decompose()
+
+    remove_hidden_elements(soup)
 
     candidates = []
     seen = set()
