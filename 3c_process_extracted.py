@@ -479,8 +479,6 @@ def test_file(path: str, outf_path=None, adoption_outf_path=None) -> None:
 
 if __name__ == "__main__":
     import sys
-    print(len(sys.argv))
-    print(sys.argv[1])
     if len(sys.argv) > 2 and sys.argv[1] == "--test":
         test_file(sys.argv[2], "llm_outputs/test_output.jsonl", "llm_outputs/test_adoption_output.jsonl")
     else:
