@@ -348,10 +348,7 @@ def process_file(cik: str, filings: dict, outf, adoption_outf=None) -> None:
     """Write out all statements for a single extraction record."""
 
     for year, entries in filings.items():
-        if (year == "2018"):
             process_year(cik, year, entries, outf, adoption_outf)
-        else:
-            print(f"skipping CIK {cik} year {year} (only processing 2018 in this version)")
 
 
 def process_dir(path: str = BASE_DIR) -> None:
